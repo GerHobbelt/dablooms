@@ -141,7 +141,7 @@ help:
 
 clean:
 	rm -f $(DEPS) $(OBJS_LIBDABLOOMS) $(patsubst %, $(BLDDIR)/%, $(LIB_FILES)) $(OBJS_TESTS) $(BLDDIR)/test_dablooms $(BLDDIR)/testbloom.bin
-	rmdir $(BLDDIR)
+	-rmdir $(BLDDIR)
 
 .PHONY: all clean help install test libdablooms install_libdablooms
 
