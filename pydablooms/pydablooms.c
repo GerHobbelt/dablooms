@@ -1,3 +1,4 @@
+#define PY_SSIZE_T_CLEAN
 #include <Python.h>
 #include "dablooms.h"
 #include "structmember.h"
@@ -13,19 +14,19 @@ typedef struct {
 
 static void Dablooms_dealloc(Dablooms *self)
 {
-	if(self->filter)
+    if(self->filter)
         free_scaling_bloom(self->filter);
-    self->ob_type->tp_free((PyObject *)self);
+    self->ob_base.ob_type->tp_free((PyObject *)self);
 }
 
 static PyObject *Dablooms_new(PyTypeObject *type, PyObject *args, PyObject *kwds)
 {
     Dablooms *self;
-    
+
     if ((self = (Dablooms *)type->tp_alloc(type, 0)) == NULL) {
         return NULL;
     }
-    
+
     self->filter = NULL;
     return (PyObject *) self;
 }
@@ -33,30 +34,29 @@ static PyObject *Dablooms_new(PyTypeObject *type, PyObject *args, PyObject *kwds
 static int Dablooms_init(Dablooms *self, PyObject *args, PyObject *kwds)
 {
     double error_rate = 0.1;
-    const char *filepath = "/tmp/bloom.bin";
-    int capacity = 1;  // dropped the unsigned modifier to avoid implicit conversion from negative
+    const char *filepath = NULL;
+    int capacity = 1;
     static char *kwlist[] = {"capacity", "error_rate", "filepath", NULL};
-    
-    if (! PyArg_ParseTupleAndKeywords(args, kwds, "|ids", kwlist,
-                                      &capacity, &error_rate, &filepath)) {
+
+    if (!PyArg_ParseTupleAndKeywords(args, kwds, "ids", kwlist,
+                                     &capacity, &error_rate, &filepath)) {
         return -1;
     }
 
     if (capacity < 1){
         PyErr_SetString(DabloomsError, "Bloom creation failed: capacity must be greater than zero");
-    	return -1;
+        return -1;
     }
     if (error_rate > 1 || error_rate < 0){
-    	PyErr_SetString(DabloomsError, "Bloom creation failed: error_rate must be between 0 and 1");
-    	return -1;
+        PyErr_SetString(DabloomsError, "Bloom creation failed: error_rate must be between 0 and 1");
+        return -1;
     }
     if(!(filepath && strlen(filepath))){
-    	PyErr_SetString(DabloomsError, "Bloom creation failed: filepath required");
-    	return -1;
+        PyErr_SetString(DabloomsError, "Bloom creation failed: filepath required");
+        return -1;
     }
-    
+
     self->filter = new_scaling_bloom(capacity, error_rate, filepath);
-    
     return 0;
 }
 
@@ -64,20 +64,21 @@ static int Dablooms_init(Dablooms *self, PyObject *args, PyObject *kwds)
 static int contains(Dablooms *self, PyObject *key)
 {
     const char *hash;
-    int len;
-    
+    Py_ssize_t len;
+
     if (!PyArg_Parse(key, "s#", &hash, &len)) {
         return -1;
     }
     return scaling_bloom_check(self->filter, hash, len);
 }
 
-static PyObject *check(Dablooms *self, PyObject *args)
+static PyObject *check(Dablooms *self, PyObject *args, PyObject *kwds)
 {
     const char *hash;
-    int len;
-    
-    if (!PyArg_ParseTuple(args, "s#", &hash, &len)) {
+    Py_ssize_t len;
+    static char *kwlist[] = {"hash", NULL};
+
+    if (!PyArg_ParseTupleAndKeywords(args, kwds, "s#", kwlist, &hash, &len)) {
         return NULL;
     }
     return Py_BuildValue("i", scaling_bloom_check(self->filter, hash, len));
@@ -86,42 +87,42 @@ static PyObject *check(Dablooms *self, PyObject *args)
 static PyObject *add(Dablooms *self, PyObject *args, PyObject *kwds)
 {
     const char *hash;
-    int len;
+    Py_ssize_t len;
     unsigned long long id;
     static char *kwlist[] = {"hash", "id", NULL};
-    
-    if (! PyArg_ParseTupleAndKeywords(args, kwds, "|s#K", kwlist, &hash, &len, &id)) {
+
+    if (!PyArg_ParseTupleAndKeywords(args, kwds, "s#K", kwlist, &hash, &len, &id)) {
         return NULL;
     }
-    
+
     return Py_BuildValue("i", scaling_bloom_add(self->filter, hash, len, id));
 }
 
 static PyObject *delete(Dablooms *self, PyObject *args, PyObject *kwds)
 {
     const char *hash;
-    int len;
+    Py_ssize_t len;
     unsigned long long id;
     static char *kwlist[] = {"hash", "id", NULL};
-    
-    if (! PyArg_ParseTupleAndKeywords(args, kwds, "|s#K", kwlist, &hash, &len, &id)) {
+
+    if (!PyArg_ParseTupleAndKeywords(args, kwds, "s#K", kwlist, &hash, &len, &id)) {
         return NULL;
     }
-    
+
     return Py_BuildValue("i", scaling_bloom_remove(self->filter, hash, len, id));
 }
 
-static PyObject *flush(Dablooms *self, PyObject *args, PyObject *kwds)
+static PyObject *flush(Dablooms *self, PyObject *args)
 {
     return Py_BuildValue("i", scaling_bloom_flush(self->filter));
 }
 
-static PyObject *mem_seqnum(Dablooms *self, PyObject *args, PyObject *kwds)
+static PyObject *mem_seqnum(Dablooms *self, PyObject *args)
 {
     return Py_BuildValue("K", scaling_bloom_mem_seqnum(self->filter));
 }
 
-static PyObject *disk_seqnum(Dablooms *self, PyObject *args, PyObject *kwds)
+static PyObject *disk_seqnum(Dablooms *self, PyObject *args)
 {
     return Py_BuildValue("K", scaling_bloom_disk_seqnum(self->filter));
 }
@@ -130,9 +131,9 @@ static PyMethodDef Dablooms_methods[] = {
     {"add",         (PyCFunction)add,         METH_VARARGS | METH_KEYWORDS, "Add an element to the bloom filter."},
     {"delete",      (PyCFunction)delete,      METH_VARARGS | METH_KEYWORDS, "Remove an element from the bloom filter."},
     {"check",       (PyCFunction)check,       METH_VARARGS | METH_KEYWORDS, "Check if an element is in the bloom filter."},
-    {"flush",       (PyCFunction)flush,       METH_VARARGS | METH_KEYWORDS, "Flush a bloom filter to file."},
-    {"mem_seqnum",  (PyCFunction)mem_seqnum,  METH_VARARGS | METH_KEYWORDS, "Get the memory-consistent sequence number."},
-    {"disk_seqnum", (PyCFunction)disk_seqnum, METH_VARARGS | METH_KEYWORDS, "Get the disk-consistent sequence number."},
+    {"flush",       (PyCFunction)flush,       METH_NOARGS, "Flush a bloom filter to file."},
+    {"mem_seqnum",  (PyCFunction)mem_seqnum,  METH_NOARGS, "Get the memory-consistent sequence number."},
+    {"disk_seqnum", (PyCFunction)disk_seqnum, METH_NOARGS, "Get the disk-consistent sequence number."},
     {NULL},       /* Sentinel */
 };
 
@@ -152,8 +153,7 @@ static PySequenceMethods Dablooms_sequence = {
 };
 
 static PyTypeObject DabloomsType = {
-    PyObject_HEAD_INIT(NULL)
-    0,                              /*ob_size*/
+    PyObject_HEAD_INIT(0)
     "pydablooms.Dablooms",          /*tp_name*/
     sizeof(Dablooms),               /*tp_basicsize*/
     0,                              /*tp_itemsize*/
@@ -197,27 +197,27 @@ static PyObject *load_dabloom(PyTypeObject *type, PyObject *args, PyObject *kwds
 {
     Dablooms *self = (Dablooms *)PyObject_New(Dablooms, &DabloomsType);
     double error_rate = 0.1;
-    const char *filepath = "/tmp/bloom.bin";
-    int capacity = 1;  // dropped the unsigned modifier to avoid implicit conversion from negative
+    const char *filepath = NULL;
+    int capacity = 1;
     int result = 0;
     static char *kwlist[] = {"capacity", "error_rate", "filepath", NULL};
 
-    if (! PyArg_ParseTupleAndKeywords(args, kwds, "|ids", kwlist,
+    if (! PyArg_ParseTupleAndKeywords(args, kwds, "ids", kwlist,
                                       &capacity, &error_rate, &filepath)) {
         return NULL;
     }
 
     if (capacity < 1){
         PyErr_SetString(DabloomsError, "Bloom creation failed: capacity must be greater than zero");
-    	result = -1;
+        result = -1;
     }
     else if (error_rate > 1 || error_rate < 0){
-    	PyErr_SetString(DabloomsError, "Bloom creation failed: error_rate must be between 0 and 1");
-    	result = -1;
+        PyErr_SetString(DabloomsError, "Bloom creation failed: error_rate must be between 0 and 1");
+        result = -1;
     }
     else if(!(filepath && strlen(filepath))){
-    	PyErr_SetString(DabloomsError, "Bloom creation failed: filepath required");
-    	result = -1;
+        PyErr_SetString(DabloomsError, "Bloom creation failed: filepath required");
+        result = -1;
     }
 
     if (!result){
@@ -233,30 +233,34 @@ static PyMethodDef pydablooms_methods[] = {
     {NULL}
 };
 
-#ifndef PyMODINIT_FUNC
-#define PyMODINIT_FUNC void
-#endif
+static struct PyModuleDef pydablooms = {
+    PyModuleDef_HEAD_INIT,
+    "pydablooms",
+    NULL, /* module documentation, may be NULL */
+    -1,   /* size of per-interpreter state of the module,
+             or -1 if the module keeps state in global variables. */
+    pydablooms_methods,
+};
 
-
-PyMODINIT_FUNC initpydablooms(void)
+PyMODINIT_FUNC PyInit_pydablooms(void)
 {
     PyObject *m;
     if (PyType_Ready(&DabloomsType) < 0) {
-        return;
+        return NULL;
     }
-    
-    m = Py_InitModule3("pydablooms", pydablooms_methods, "Dablooms module");
-    
+
+    m = PyModule_Create(&pydablooms);
     if (m == NULL) {
-        return;
+        return NULL;
     }
-    
-    PyModule_AddObject(m, "__version__", PyString_FromString(dablooms_version()));
-    
+
+    PyModule_AddObject(m, "__version__", PyUnicode_FromString(dablooms_version()));
+
     Py_INCREF(&DabloomsType);
     PyModule_AddObject(m, "Dablooms", (PyObject *)&DabloomsType);
 
     DabloomsError = PyErr_NewException("Dablooms.Error", NULL, NULL);
     Py_INCREF(DabloomsError);
     PyModule_AddObject(m, "error", DabloomsError);
+    return m;
 }
