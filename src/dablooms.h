@@ -1,4 +1,9 @@
-/* Copyright @2012 by Justin Hines at Bitly under a very liberal license. See LICENSE in the source distribution. */
+/* Copyright 2012-2013 by Justin Hines at Bitly under a very liberal license.
+ * Copyright 2012-2024 by Pierce Lopez
+ * Copyright 2012 by Matt Reiferson
+ * Copyright 2012 by Vicent Marti
+ * See LICENSE in the source distribution.
+ */
 
 #ifndef __BLOOM_H__
 #define __BLOOM_H__

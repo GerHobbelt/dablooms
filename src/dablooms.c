@@ -1,4 +1,9 @@
-/* Copyright @2012 by Justin Hines at Bitly under a very liberal license. See LICENSE in the source distribution. */
+/* Copyright 2012-2013 by Justin Hines at Bitly under a very liberal license.
+ * Copyright 2012-2024 by Pierce Lopez
+ * Copyright 2012 by Matt Reiferson
+ * Copyright 2012 by Vicent Marti
+ * See LICENSE in the source distribution.
+ */
 
 #define _GNU_SOURCE
 #include <sys/stat.h>
@@ -16,7 +21,7 @@
 #include "murmur.h"
 #include "dablooms.h"
 
-#define DABLOOMS_VERSION "0.9.1"
+#define DABLOOMS_VERSION "0.9.2"
 
 #define ERROR_TIGHTENING_RATIO 0.5
 #define SALT_CONSTANT 0x97c29b3a
