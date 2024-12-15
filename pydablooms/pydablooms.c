@@ -1,5 +1,6 @@
 #define PY_SSIZE_T_CLEAN
 #include <Python.h>
+
 #include "dablooms.h"
 #include "structmember.h"
 
@@ -16,14 +17,15 @@ static void Dablooms_dealloc(Dablooms *self)
 {
     if(self->filter)
         free_scaling_bloom(self->filter);
+
     self->ob_base.ob_type->tp_free((PyObject *)self);
 }
 
 static PyObject *Dablooms_new(PyTypeObject *type, PyObject *args, PyObject *kwds)
 {
-    Dablooms *self;
+    Dablooms *self = (Dablooms *)type->tp_alloc(type, 0);
 
-    if ((self = (Dablooms *)type->tp_alloc(type, 0)) == NULL) {
+    if (self == NULL) {
         return NULL;
     }
 
@@ -127,6 +129,10 @@ static PyObject *disk_seqnum(Dablooms *self, PyObject *args)
     return Py_BuildValue("K", scaling_bloom_disk_seqnum(self->filter));
 }
 
+static PyMemberDef Dablooms_members[] = {
+    {NULL}  /* Sentinel */
+};
+
 static PyMethodDef Dablooms_methods[] = {
     {"add",         (PyCFunction)add,         METH_VARARGS | METH_KEYWORDS, "Add an element to the bloom filter."},
     {"delete",      (PyCFunction)delete,      METH_VARARGS | METH_KEYWORDS, "Remove an element from the bloom filter."},
@@ -137,65 +143,28 @@ static PyMethodDef Dablooms_methods[] = {
     {NULL},       /* Sentinel */
 };
 
-static PyMemberDef Dablooms_members[] = {
-    {NULL}  /* Sentinel */
-};
-
 static PySequenceMethods Dablooms_sequence = {
-  NULL,                 /*sq_length*/
-  NULL,                 /*sq_concat*/
-  NULL,                 /*sq_repeat*/
-  NULL,                 /*sq_item*/
-  NULL,                 /*sq_slice*/
-  NULL,                 /*sq_ass_item*/
-  NULL,                 /*sq_ass_slice*/
-  (objobjproc)contains, /*sq_contains*/
+    .sq_contains = (objobjproc) contains,
 };
 
 static PyTypeObject DabloomsType = {
-    PyObject_HEAD_INIT(0)
-    "pydablooms.Dablooms",          /*tp_name*/
-    sizeof(Dablooms),               /*tp_basicsize*/
-    0,                              /*tp_itemsize*/
-    (destructor)Dablooms_dealloc,   /*tp_dealloc*/
-    0,                              /*tp_print*/
-    0,                              /*tp_getattr*/
-    0,                              /*tp_setattr*/
-    0,                              /*tp_compare*/
-    0,                              /*tp_repr*/
-    0,                              /*tp_as_number*/
-    &Dablooms_sequence,             /*tp_as_sequence*/
-    0,                              /*tp_as_mapping*/
-    0,                              /*tp_hash*/
-    0,                              /*tp_call*/
-    0,                              /*tp_str*/
-    0,                              /*tp_getattro*/
-    0,                              /*tp_setattro*/
-    0,                              /*tp_as_buffer*/
-    Py_TPFLAGS_DEFAULT,             /*tp_flags*/
-    "Dablooms objects",             /*tp_doc*/
-    0,                              /*tp_traverse*/
-    0,                              /*tp_clear*/
-    0,                              /*tp_richcompare*/
-    0,                              /*tp_weaklistoffset*/
-    0,                              /*tp_iter*/
-    0,                              /*tp_iternext*/
-    Dablooms_methods,               /*tp_methods*/
-    Dablooms_members,               /*tp_members*/
-    0,                              /*tp_getset*/
-    0,                              /*tp_base*/
-    0,                              /*tp_dict*/
-    0,                              /*tp_descr_get*/
-    0,                              /*tp_descr_set*/
-    0,                              /*tp_dictoffset*/
-    (initproc)Dablooms_init,        /*tp_init*/
-    0,                              /*tp_alloc*/
-    Dablooms_new,                   /*tp_new*/
+    {PyObject_HEAD_INIT(NULL)},
+    .tp_name        = "pydablooms.Dablooms",
+    .tp_doc         = PyDoc_STR("Dablooms objects"),
+    .tp_basicsize   = sizeof(Dablooms),
+    .tp_itemsize    = 0,
+    .tp_flags       = Py_TPFLAGS_DEFAULT,
+    .tp_new         = Dablooms_new,
+    .tp_init        = (initproc)   Dablooms_init,
+    .tp_dealloc     = (destructor) Dablooms_dealloc,
+    .tp_members     = Dablooms_members,
+    .tp_methods     = Dablooms_methods,
+    .tp_as_sequence = &Dablooms_sequence,
 };
 
 static PyObject *load_dabloom(PyTypeObject *type, PyObject *args, PyObject *kwds)
 {
-    Dablooms *self = (Dablooms *)PyObject_New(Dablooms, &DabloomsType);
+    Dablooms *self = PyObject_New(Dablooms, &DabloomsType);
     double error_rate = 0.1;
     const char *filepath = NULL;
     int capacity = 1;
@@ -220,16 +189,16 @@ static PyObject *load_dabloom(PyTypeObject *type, PyObject *args, PyObject *kwds
         result = -1;
     }
 
-    if (!result){
-        self->filter = new_scaling_bloom_from_file(capacity, error_rate, filepath);
-        return (PyObject *) self;
+    if (result < 0) {
+        Dablooms_dealloc(self);
+        return NULL;
     }
-    Dablooms_dealloc(self);
-    return NULL;
+    self->filter = new_scaling_bloom_from_file(capacity, error_rate, filepath);
+    return (PyObject *)self;
 }
 
 static PyMethodDef pydablooms_methods[] = {
-    {"load_dabloom", (PyCFunction)load_dabloom, METH_VARARGS | METH_KEYWORDS, "Add an element to the bloom filter."},
+    {"load_dabloom", (PyCFunction)load_dabloom, METH_VARARGS | METH_KEYWORDS, "Load scaling-bloom from file"},
     {NULL}
 };
 

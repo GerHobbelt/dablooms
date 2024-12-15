@@ -2,7 +2,7 @@ import sys, os
 
 import pydablooms
 
-capacity = 100000
+capacity = 10000
 error_rate = 0.05
 
 print("pydablooms version: %s" % pydablooms.__version__)
