@@ -187,7 +187,7 @@ int bitmap_flush(bitmap_t *bitmap)
  */
 void hash_func(counting_bloom_t *bloom, const char *key, size_t key_len, uint32_t *hashes)
 {
-    int i;
+    unsigned int i;
     uint32_t checksum[4];
     
     MurmurHash3_x64_128(key, key_len, SALT_CONSTANT, checksum);
@@ -319,7 +319,7 @@ int free_scaling_bloom(scaling_bloom_t *bloom)
 /* creates a new counting bloom filter from a given scaling bloom filter, with count and id */
 counting_bloom_t *new_counting_bloom_from_scale(scaling_bloom_t *bloom)
 {
-    int i;
+    unsigned int i;
     long offset;
     double error_rate;
     counting_bloom_t *cur_bloom;
@@ -374,7 +374,7 @@ counting_bloom_t *new_counting_bloom_from_file(unsigned int capacity, double err
     
     bloom = counting_bloom_init(capacity, error_rate, 0);
     
-    if (size != bloom->num_bytes) {
+    if (size != (off_t)bloom->num_bytes) {
         free_counting_bloom(bloom);
         fprintf(stderr, "Error, Actual filesize and expected filesize are not equal\n");
         return NULL;
