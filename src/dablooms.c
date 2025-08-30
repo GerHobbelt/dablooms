@@ -14,8 +14,15 @@
 #include <fcntl.h>
 #include <math.h>
 #include <string.h>
+#ifndef _WIN32
 #include <sys/mman.h>
 #include <unistd.h>
+#else
+#include <sys/mman.h>   // a Win32 port of mmap/munmap
+#include <io.h>
+typedef int mode_t;
+extern int ftruncate(int handle, size_t size);
+#endif
 #include <errno.h>
 
 #include "murmur.h"
